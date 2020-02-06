@@ -1,16 +1,115 @@
 #include "Aether.h"
-#include "Plane.h"
+#include "plane/Plane.h"
 #include <stdlib.h>
-#include "Rocket.h"
-#include "Wall.h"
+#include <fstream>
+#include <string>
+#include <sstream>
+
+// https://stackoverflow.com/questions/1120140/how-can-i-read-and-parse-csv-files-in-c
+enum class CSVState
+{
+	UnquotedField,
+	QuotedField,
+	QuotedQuote
+};
+
+std::vector<std::string> readCSVRow(const std::string& row)
+{
+	CSVState state = CSVState::UnquotedField;
+	std::vector<std::string> fields{ "" };
+	size_t i = 0; // index of the current field
+	for (char c : row)
+	{
+		switch (state)
+		{
+		case CSVState::UnquotedField:
+			switch (c)
+			{
+			case ',': // end of field
+				fields.push_back(""); i++;
+				break;
+			case '"': state = CSVState::QuotedField;
+				break;
+			default:  fields[i].push_back(c);
+				break;
+			}
+			break;
+		case CSVState::QuotedField:
+			switch (c)
+			{
+			case '"': state = CSVState::QuotedQuote;
+				break;
+			default:  fields[i].push_back(c);
+				break;
+			}
+			break;
+		case CSVState::QuotedQuote:
+			switch (c)
+			{
+			case ',': // , after closing quote
+				fields.push_back(""); i++;
+				state = CSVState::UnquotedField;
+				break;
+			case '"': // "" -> "
+				fields[i].push_back('"');
+				state = CSVState::QuotedField;
+				break;
+			default:  // end of quote
+				state = CSVState::UnquotedField;
+				break;
+			}
+			break;
+		}
+	}
+	return fields;
+}
+
+/// Read CSV file, Excel dialect. Accept "quoted fields ""with quotes"""
+std::vector<std::vector<std::string>> readCSV(std::istream &in)
+{
+	std::vector<std::vector<std::string>> table;
+	std::string row;
+	while (!in.eof())
+	{
+		std::getline(in, row);
+		if (in.bad() || in.fail())
+		{
+			break;
+		}
+		auto fields = readCSVRow(row);
+		table.push_back(fields);
+	}
+	return table;
+}
+Aether::Aether()
+{
+	std::ifstream file("stops.txt");
+	std::vector<std::vector<std::string>> data = readCSV(file);
+	file.close();
+
+	for (auto& line : data)
+	{
+		try
+		{
+			this->_points.push_back(std::make_pair(std::make_pair(std::stod(line[4]), std::stod(line[5])), line[2]));
+		}
+		catch (const std::exception&)
+		{ }
+	}
+
+	for (size_t i = 0; i < 100 && i < this->_points.size(); i++)
+	{
+		std::cout << this->_points[i].first.first << " " << this->_points[i].first.second << " " << this->_points[i].second  << std::endl;
+	}
+}
 
 Aether::~Aether()
 {
-	for (size_t i = 0; i < world.size(); i++)
-	{
-		delete world[i];
-		world[i] = nullptr;
-	}
+	//for (size_t i = 0; i < world.size(); i++)
+	//{
+	//	delete world[i];
+	//	world[i] = nullptr;
+	//}
 }
 
 bool Aether::OnUserCreate()
@@ -20,16 +119,6 @@ bool Aether::OnUserCreate()
 	Plane::OnUserCreate();
 	std::cout << __FUNCTION__ << std::endl;
 
-	for (size_t i = 0; i < 100; i++)
-	{
-	break;
-		Rocket* r = new Rocket;
-		r->accelerate(Vec2d((rand()%1000)/10.0 -50, (rand()%1000)/10.0 -50));
-		world.push_back(r);
-	}
-
-	Wall* w = new Wall(Vec2d(0,0),10,10);
-	world.push_back(w);
 
 	return true;
 }
@@ -44,50 +133,31 @@ bool Aether::OnUserUpdate(float fElapsedTime)
 	double maxx = maxX();
 	double maxy = maxY();
 
-	std::sort(std::begin(world), std::end(world), [](const Drawable* const a, const Drawable* const b) -> bool
+	int s = 90;
+	for (int x = -s; x < s; x++)
 	{
-		return a->getZIndex() < b->getZIndex();
-	});
-
-	for (size_t i = 0; i < world.size(); i++)
-	{
-		if(typeid(*world[i]) == typeid(Rocket) )
+		for (int y = -s; y < s; y++)
 		{
-			static_cast<Rocket*>(world[i])->move(fElapsedTime);
+			Draw(x, y, olc::YELLOW);
 		}
-		if(typeid(*world[i]) == typeid(Wall) )
-		{
-			Vec2d mousePos(stocx( GetMouseX()), stocy(GetMouseY()));
-			double dist = static_cast<Wall*>(world[i])->distanceTo(mousePos);
-			std::cout << dist << std::endl;
-			olc::Pixel color(((int)dist / 4) % 255, ((int)dist / 2) % 255, ((int)dist) % 255);
-			if (dist < 0.0)
-			{
-				color.r = 255;
-				color.g = ((int)-dist / 2) % 255;
-				color.b = ((int)-dist    ) % 255;
-			}
-			if(dist == 0.0)
-			{
-				color.g = 255;
-			}
-
-			Draw(mousePos.x, mousePos.y, color);
-		}
-
-		world[i]->draw(this);
 	}
 
-	/**
-	for (size_t i = 0; i < 1000; i++)
+	int num = 0;
+	for(auto& p : this->_points)
 	{
-		double x1 = minx + (rand()%1000)/1000.0 * (maxx-minx);
-		double x2 = minx + (rand()%1000)/1000.0 * (maxx-minx);
-		double y1 = miny + (rand()%1000)/1000.0 * (maxy-miny);
-		double y2 = miny + (rand()%1000)/1000.0 * (maxy-miny);
-		DrawLine(x1, y1, x2, y2);
+		if(num++ > 100) break;
+		Draw(p.first.first, p.first.second, olc::WHITE);
+		DrawString(p.first.first, p.first.second, p.second, olc::GREEN);
 	}
-	/**/
+
+	//for (size_t i = 0; i < 1000; i++)
+	//{
+	//	double x1 = minx + (rand()%1000)/1000.0 * (maxx-minx);
+	//	double x2 = minx + (rand()%1000)/1000.0 * (maxx-minx);
+	//	double y1 = miny + (rand()%1000)/1000.0 * (maxy-miny);
+	//	double y2 = miny + (rand()%1000)/1000.0 * (maxy-miny);
+	//	DrawLine(x1, y1, x2, y2);
+	//}
 
 	return true;
 }

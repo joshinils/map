@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
 project("map")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 
 if(UNIX)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -fpermissive")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -fpermissive")
 elseif(MSVC)
 	# suppress warning about unknown options -pthread and -fpermissive
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 endif(UNIX)
 
 add_executable("${PROJECT_NAME}" 
@@ -19,6 +19,8 @@ add_executable("${PROJECT_NAME}"
 	"plane/Plane.cpp"
 	"plane/Vec2d.h"
 	"plane/Vec2d.cpp"
+	"olcPixelGameEngine/olcPixelGameEngine.h"
+	"plane/olcPixelGameEngine/olcPixelGameEngine.h"
 )
 
 include_directories(olcPixelGameEngine)
